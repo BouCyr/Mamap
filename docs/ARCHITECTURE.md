@@ -75,8 +75,11 @@ should not change later, even as fields get added):
   Decoding the height-map image file into raw pixel values is
   platform-specific (a `<canvas>` in the browser, an image-decoding utility
   in Node) and happens outside `core`. `core/terrain` itself only ever
-  receives already-decoded grayscale data (a plain grid of 0–1 numbers), not
-  an image file or a DOM `Image` object — this is what keeps it portable.
+  receives already-decoded grayscale data, not an image file or a DOM
+  `Image` object — this is what keeps it portable. Concretely, it takes a
+  `sampleHeight(x, y) -> 0..1` function rather than a raw pixel grid, so
+  that grid resolution and interpolation are also the decoding adapter's
+  concern, not terrain's.
 - **sea-level → corrected elevation + underwater flag**: takes a ratio
   parameter (33% by default, overridable) and the raw per-point elevation
   from `terrain`. The lowest-elevation points, by count, up to that ratio
@@ -189,22 +192,28 @@ parameters in and rendered output out.
 - Before adding any dependency, check whether the need is small enough to
   write directly (a few dozen lines of clear code beats a dependency for
   something like "compute a 2D cross product").
-- Categories identified so far (no exact libraries chosen yet — this is a
-  note for whoever implements the matching phase, not a commitment):
-  - **Point sampling** (phase 2, points): needed — Poisson-disk sampling for
-    the even pass over the map.
-  - **Triangulation / Voronoi** (phase 2, mesh): needed — building a bounded
-    Voronoi diagram from the point set.
-  - **Noise** (phase 3, terrain): needed — Simplex noise, used as a
-    multiplying factor on the height-map value at each point.
-  - **Image decoding** (phase 3, terrain, Node side only): needed in the
-    Node-side adapter that reads the height-map image file into raw pixel
-    values (see section 2) — not needed in the browser, which can decode
-    images with a `<canvas>` and no extra dependency.
+- Chosen so far:
+  - **Point sampling** (phase 2, `core/points`): `poisson-disk-sampling@2.3.1`
+    for the even pass over the map, given our seeded random source as its
+    RNG so it stays deterministic. Depends only on `moore` (tiny, no
+    further dependencies).
+  - **Triangulation / Voronoi** (phase 2, `core/mesh`): `d3-delaunay@6.0.4`.
+    Gives both the bounded Voronoi diagram (`cellPolygon`) and the
+    site-adjacency graph (`neighbors`) directly, so nothing extra was
+    needed for either. Depends only on `delaunator@5` (also small).
+  - **Noise** (phase 3, `core/terrain`): `simplex-noise@4.0.3`, used as a
+    multiplying factor on the height-map value at each point. No further
+    dependencies.
+- Still needed, not chosen yet:
+  - **Image decoding** (phase 3, Node side only): the Node-side adapter
+    that will read a real height-map image file into a `(x, y) => value`
+    sampler (see section 2). Not yet built — the current terrain tests and
+    the debug script (`scripts/debug-render.js`) pass in a plain function
+    directly instead, e.g. `() => 0.5` for a blank height-map. Not needed
+    in the browser, which can decode images with a `<canvas>` and no extra
+    dependency.
   - **Vector/matrix math** (phase 8/12): 3D vector, matrix, and quaternion
     helpers for building volumes and the WebGL preview camera.
-  Each will be picked, justified in a short note, and pinned when its phase
-  actually starts.
 
 ## 7. Dependency delivery (browser)
 
@@ -231,14 +240,16 @@ works — see [PROJECT_PLAN.md](./PROJECT_PLAN.md#8-decisions-made-so-far).
 
 ```
 docs/                   Project plan and this document.
+scripts/
+  debug-render.js       Dev-only: runs the pipeline through sea-level and writes a debug SVG. Not part of the real pipeline.
 src/
   core/                 Pure generation logic. Node- and browser-safe.
     model/              Phase 1: shared point/edge/cell containers and the city-model bundle. Implemented.
     random/             Phase 1: seeded random source (mulberry32), shared by every stage. Implemented.
-    points/             Phase 2: point-set generation (Poisson-disk + random passes). Not yet scaffolded.
-    mesh/               Phase 2: Voronoi diagram + site-adjacency graph, short-edge collapse. Not yet scaffolded.
-    terrain/            Phase 3: per-point elevation from a height-map image + noise, with local max/min correction.
-    sea-level/          Phase 4: underwater flag + elevation shift so sea level sits at 0. Not yet scaffolded.
+    points/             Phase 2: point-set generation (Poisson-disk + random passes). Implemented.
+    mesh/               Phase 2: Voronoi diagram + site-adjacency graph, short-edge collapse. Implemented.
+    terrain/            Phase 3: per-point elevation from a height-map sampler + noise, with local max/min correction. Implemented.
+    sea-level/          Phase 4: underwater flag + elevation shift so sea level sits at 0. Implemented.
     coastline/          Phase 5: split edges + new edges forming the coastline at elevation 0. Not yet scaffolded.
     roads/              Phase 6: street graph generation.
     parcels/            Phase 7: block/lot polygon generation.
@@ -253,10 +264,8 @@ src/
 test/                   Tests, mirroring the src/ layout.
 ```
 
-`points/`, `mesh/`, `sea-level/`, and `coastline/` are new since those
-stages were decided; they are not yet created (see phase 0's scaffold — it
-predates these decisions). They will be added, as empty stubs like their
-siblings, at the start of their phase.
+`coastline/` is still not created — it is the next unimplemented stage. Its
+folder will be added, like its siblings, once phase 5 starts.
 
 ## 9. Coding conventions
 
