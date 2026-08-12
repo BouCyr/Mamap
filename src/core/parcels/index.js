@@ -1,4 +1,4 @@
-// Parcels stage (see docs/PROJECT_PLAN.md, phase 4).
+// Parcels stage (see docs/PROJECT_PLAN.md, phase 5).
 //
 // Takes the street graph and splits the space between road edges into
 // blocks, and blocks into parcels (individual building lots): closed

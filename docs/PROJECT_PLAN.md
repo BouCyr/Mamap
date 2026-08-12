@@ -79,16 +79,17 @@ if rough.
 | Phase | Name | Output |
 |---|---|---|
 | 0 | Scaffold | Folder layout, docs, empty module stubs (this phase). |
-| 1 | Core data model | Shared types/shapes used by every later module: grid, graph, polygon, and the city-model object that gets passed between stages. No generation yet, just the containers. |
-| 2 | Terrain | A heightmap for the city area (hills, flat ground, maybe a river/coastline), from a seed. |
-| 3 | Road network | A graph of streets laid over the terrain: a small number of main roads, then a filled-in grid/organic network of minor streets, blocked by terrain where needed. |
-| 4 | Parcels & blocks | The area between streets is split into blocks, and blocks into parcels (individual building lots). |
-| 5 | Buildings (3D massing) | Each parcel gets a simple building volume: footprint plus height, maybe a basic roof shape. This is the last step of the 3D model. |
-| 6 | 3D preview (browser) | A minimal WebGL viewer that shows the generated 3D model (terrain + roads + building blocks), so the generator's output can be sanity-checked visually. Browser-only; not the final deliverable. |
-| 7 | Projection (3D → 2D) | Flatten the 3D city model into a 2D map description: road lines with widths, block/parcel outlines, building footprints with a fill derived from height or type. |
-| 8 | 2D map rendering | Turn the flattened 2D description into an actual map: colors, line weights, a simple legend/style. Must work both as a file written from Node and as an on-screen result in the browser. |
-| 9 | UI & CLI polish | Simple browser form (seed + a few parameters + "generate" button) around phase 8's output, and an equivalent Node CLI entry point. Export to a file (e.g. SVG/PNG) from either side. |
-| 10 | Tuning pass | No new features — revisit parameters and defaults so generated cities look good across a range of seeds. |
+| 1 | Core data model | Shared types/shapes used by every later module: point, edge, cell/polygon, and the city-model object that gets passed between stages. No generation yet, just the containers. |
+| 2 | Point mesh | A set of points covering the map, built in two passes: an even, minimum-spacing pass (Poisson-disk sampling), then a plain random pass (extra points with no spacing rule). A Voronoi diagram is then built from those points and clipped to the map's bounds. A cleanup pass collapses any diagram edge shorter than a set threshold down to a single point. |
+| 3 | Terrain / elevation | An elevation value for every point in the mesh. Read from a height-map image (any image, converted to grayscale and normalized to 0–1), sampled at each point's position, with noise added on top. A correction pass then flattens any point that ended up as a strict local maximum or minimum among its mesh neighbors, unless that point sits on the edge of the map. |
+| 4 | Road network | A graph of streets laid over the mesh: a small number of main roads, then a filled-in grid/organic network of minor streets, blocked by terrain where needed. |
+| 5 | Parcels & blocks | The area between streets is split into blocks, and blocks into parcels (individual building lots). |
+| 6 | Buildings (3D massing) | Each parcel gets a simple building volume: footprint plus height, maybe a basic roof shape. This is the last step of the 3D model. |
+| 7 | 3D preview (browser) | A minimal WebGL viewer that shows the generated 3D model (terrain + roads + building blocks), so the generator's output can be sanity-checked visually. Browser-only; not the final deliverable. |
+| 8 | Projection (3D → 2D) | Flatten the 3D city model into a 2D map description: road lines with widths, block/parcel outlines, building footprints with a fill derived from height or type. |
+| 9 | 2D map rendering | Turn the flattened 2D description into the final 5000 × 5000 SVG map: colors, line weights, a simple legend/style. Must work both as a file written from Node and as an on-screen result in the browser. |
+| 10 | UI & CLI polish | Simple browser form (seed + a few parameters + "generate" button) around phase 9's output, and an equivalent Node CLI entry point. Export to a file from either side. |
+| 11 | Tuning pass | No new features — revisit parameters and defaults so generated cities look good across a range of seeds. |
 
 Phases are meant to be done roughly in order, but a phase can be revisited
 once a later phase reveals its output isn't quite the right shape.
@@ -104,21 +105,44 @@ once a later phase reveals its output isn't quite the right shape.
 - Someone unfamiliar with the project can read `docs/ARCHITECTURE.md`, open
   any module, and understand what it takes in and what it hands back.
 
-## 8. Open questions
+## 8. Decisions made so far
+
+- **Map extent**: fixed at 5000 × 5000 units. It does not scale with a
+  parameter (for now).
+- **Output format for the final 2D map**: SVG, sized 5000 × 5000 to match the
+  map extent. See [ARCHITECTURE.md](./ARCHITECTURE.md#4-rendering) for the
+  reasoning.
+- **Point mesh approach**: a bounded Voronoi diagram over a mix of
+  Poisson-disk and plain-random points is the shared spatial structure that
+  terrain (and later, roads and parcels) is built on. See
+  [ARCHITECTURE.md](./ARCHITECTURE.md#2-pipeline-and-data-contracts).
+
+## 9. Open questions
 
 These are flagged rather than decided, and should be settled before or during
 the phase that needs them:
 
-- **Output format for the final 2D map**: SVG (vector, resolution independent,
-  trivial to write from Node as a string) vs. Canvas/PNG (raster). Current
-  lean is SVG — see [ARCHITECTURE.md](./ARCHITECTURE.md#rendering) for the
-  reasoning — but this should be confirmed before phase 8.
+- **Point mesh density**: how many points the Poisson-disk pass and the
+  plain-random pass each place, and the minimum-spacing value the
+  Poisson-disk pass uses. Decide by phase 2.
+- **Edge-collapse threshold**: how short a Voronoi edge has to be before it
+  gets collapsed to a point. Decide by phase 2.
+- **Height-map image source**: "a random image" — generated procedurally, or
+  picked from a small bundled set of images? Decide by phase 3.
+- **Elevation noise**: which noise function, and how it combines with the
+  height-map value (added on top, blended, or something else). Decide by
+  phase 3.
+- **Local max/min correction rule**: exactly how a flattened point's new
+  elevation is chosen (e.g. the average of its mesh neighbors) and how
+  "neighbor" is defined (points joined by a surviving Voronoi edge). Decide
+  by phase 3.
+- **How later phases use the mesh**: does a Voronoi cell become a parcel?
+  Does a Voronoi edge become a candidate road? Not yet decided — will be
+  settled when phases 4–5 start.
 - **Browser dependency delivery**: how npm packages reach the browser without
   a bundler (import maps vs. a small dev-only build step). See
-  [ARCHITECTURE.md](./ARCHITECTURE.md#dependency-delivery).
-- **Scale/extent**: is a "city" a fixed-size area, or does size scale with a
-  parameter? Affects how terrain and road generation are parameterized.
-  Decide by phase 2.
+  [ARCHITECTURE.md](./ARCHITECTURE.md#7-dependency-delivery-browser).
 - **Determinism**: same seed must always produce the same city. This needs a
   single seeded random source shared by every module (no use of the platform
-  `Math.random`). Decide the exact seeded-RNG approach by phase 1.
+  `Math.random`), feeding both the Poisson-disk pass and the plain-random
+  pass. Decide the exact seeded-RNG approach by phase 1.

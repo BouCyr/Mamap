@@ -28,35 +28,61 @@ classes with hidden behaviour, no references to rendering. This keeps every
 stage independently testable and lets a later stage be swapped without
 touching earlier ones.
 
+The map itself is a fixed 5000 × 5000 unit square (matching the final SVG's
+dimensions — see section 4).
+
 ```
 seed + params
-    -> terrain    -> heightmap
-    -> roads      -> street graph      (uses heightmap)
-    -> parcels    -> block/lot polygons (uses street graph)
-    -> buildings  -> building volumes   (uses parcels + heightmap)
-    -> project    -> flattened 2D map description (uses everything above)
+    -> points     -> point set
+    -> mesh       -> bounded Voronoi diagram, cleaned up   (uses point set)
+    -> terrain    -> per-point elevation                    (uses mesh)
+    -> roads      -> street graph                           (uses mesh + elevation)
+    -> parcels    -> block/lot polygons                     (uses street graph, mesh)
+    -> buildings  -> building volumes                       (uses parcels + elevation)
+    -> project    -> flattened 2D map description           (uses everything above)
 ```
 
 Planned shape of each hand-off (exact fields will firm up in phase 1, but the
 kind of object each stage produces should not change later):
 
-- **terrain → heightmap**: a 2D grid of elevation values covering the city
-  area, plus the area's size/bounds. May also mark special cells (water).
-- **roads → street graph**: nodes (points, with elevation looked up from the
-  heightmap) and edges (a road segment between two nodes, with a width/class:
-  e.g. main road vs. minor street).
+- **points → point set**: locations covering the 5000 × 5000 map, built in
+  two passes: an even, minimum-spacing pass (Poisson-disk sampling), then a
+  plain random pass (extra points, no spacing rule). The mix gives the mesh
+  an even base plus some irregular variation.
+- **mesh → bounded Voronoi diagram**: the Voronoi diagram of the point set,
+  clipped to the map's bounds (so border cells are cut off cleanly instead
+  of running to infinity), then cleaned up by collapsing any edge shorter
+  than a set threshold down to a single point.
+- **terrain → per-point elevation**: an elevation value for every point in
+  the mesh. Read from a height-map image (any image, converted to grayscale
+  and normalized to 0–1) sampled at each point's position, with noise added
+  on top. A correction pass then flattens any point that ended up as a
+  strict local maximum or minimum among its mesh neighbors, unless that
+  point sits on the edge of the map.
+
+  Decoding the height-map image file into raw pixel values is
+  platform-specific (a `<canvas>` in the browser, an image-decoding utility
+  in Node) and happens outside `core`. `core/terrain` itself only ever
+  receives already-decoded grayscale data (a plain grid of 0–1 numbers), not
+  an image file or a DOM `Image` object — this is what keeps it portable.
+- **roads → street graph**: nodes (mesh points, with elevation) and edges (a
+  road segment between two nodes, with a width/class: e.g. main road vs.
+  minor street).
 - **parcels → block/lot polygons**: closed polygons carved out of the space
-  between road edges, each tagged with the block it belongs to.
+  between road edges, each tagged with the block it belongs to. Whether this
+  reuses the mesh's Voronoi cells directly is still open — see
+  [PROJECT_PLAN.md](./PROJECT_PLAN.md#9-open-questions).
 - **buildings → building volumes**: for each parcel, a footprint polygon, a
   height, and a simple roof description.
 - **project → 2D map description**: plain lines, polygons, and fills in 2D
   map coordinates — everything the 2D renderer needs, with no 3D or terrain
   detail left in it. This is the boundary between `core` and rendering.
 
-A city model is the bundle of every stage's output kept together (terrain +
-street graph + parcels + buildings), plus the seed and parameters that made
-it. This bundle is what phase 6's 3D preview reads from; the flattened 2D map
-description is a derived, separate object, not a replacement for it.
+A city model is the bundle of every stage's output kept together (point set +
+mesh + elevation + street graph + parcels + buildings), plus the seed and
+parameters that made it. This bundle is what phase 7's 3D preview reads
+from; the flattened 2D map description is a derived, separate object, not a
+replacement for it.
 
 ## 3. Determinism
 
@@ -78,14 +104,15 @@ Two separate renderers consume `core`'s output, for two separate purposes:
   - In Node: produce the same description as a string/file (e.g. an `.svg`
     file), with no DOM involved.
 
-  Current lean: emit **SVG**. Building an SVG is just assembling elements/
-  strings — no image encoding, no native dependency — so the exact same
-  builder code can either serialize to a file (Node) or be attached live to
-  a page (browser). This avoids needing a raster/canvas dependency at all.
-  PNG export, if wanted later, can be a "take the SVG, rasterize it"
-  post-step rather than a second renderer.
+  Decided: emit an **SVG**, sized 5000 × 5000 to match the map extent.
+  Building an SVG is just assembling elements/strings — no image encoding,
+  no native dependency — so the exact same builder code can either
+  serialize to a file (Node) or be attached live to a page (browser). This
+  avoids needing a raster/canvas dependency at all. PNG export, if wanted
+  later, can be a "take the SVG, rasterize it" post-step rather than a
+  second renderer.
 
-- **`src/render/three-d/`** — the optional 3D preview from phase 6. Browser
+- **`src/render/three-d/`** — the optional 3D preview from phase 7. Browser
   only (needs a `<canvas>` and a WebGL context; there is nothing to preview
   onto in Node). Uses raw WebGL, not a 3D engine library, to stay in line
   with the "no framework" rule. In Node, this module is simply never
@@ -104,7 +131,7 @@ should not be deciding building heights — that is `buildings`' job).
 - **`src/web/`** — a small browser page: a form for the seed/parameters, a
   "generate" button, and a spot to show the result. Calls the exact same
   `core` pipeline (imported as an ES module) and the same `render/two-d`
-  code, just in its browser mode. May optionally offer the phase 6 3D
+  code, just in its browser mode. May optionally offer the phase 7 3D
   preview alongside the 2D result.
 
 Neither entry point contains generation logic of its own — they only wire
@@ -120,17 +147,20 @@ parameters in and rendered output out.
 - Before adding any dependency, check whether the need is small enough to
   write directly (a few dozen lines of clear code beats a dependency for
   something like "compute a 2D cross product").
-- Candidate categories identified so far (no libraries chosen yet — this is
-  a note for whoever implements the matching phase, not a commitment):
-  - **Noise** (phase 2, terrain): a coherent-noise function (e.g. Simplex/
-    Perlin-family) for heightmaps.
-  - **Point sampling** (phase 2/4): even-but-irregular point placement, if
-    the block/parcel or vegetation-style scattering needs it.
-  - **Triangulation / Voronoi** (phase 3/4): turning a set of points into a
-    mesh or cell diagram, if the road or parcel algorithm ends up needing
-    one (not yet decided — a graph-growth approach might avoid this
-    entirely).
-  - **Vector/matrix math** (phase 5/6): 3D vector, matrix, and quaternion
+- Categories identified so far (no exact libraries chosen yet — this is a
+  note for whoever implements the matching phase, not a commitment):
+  - **Point sampling** (phase 2, points): needed — Poisson-disk sampling for
+    the even pass over the map.
+  - **Triangulation / Voronoi** (phase 2, mesh): needed — building a bounded
+    Voronoi diagram from the point set.
+  - **Noise** (phase 3, terrain): needed — a coherent-noise function (e.g.
+    Simplex/Perlin-family) added on top of the height-map value at each
+    point.
+  - **Image decoding** (phase 3, terrain, Node side only): needed in the
+    Node-side adapter that reads the height-map image file into raw pixel
+    values (see section 2) — not needed in the browser, which can decode
+    images with a `<canvas>` and no extra dependency.
+  - **Vector/matrix math** (phase 6/7): 3D vector, matrix, and quaternion
     helpers for building volumes and the WebGL preview camera.
   Each will be picked, justified in a short note, and pinned when its phase
   actually starts.
@@ -162,19 +192,26 @@ see how well it works in practice.
 docs/                   Project plan and this document.
 src/
   core/                 Pure generation logic. Node- and browser-safe.
-    terrain/            Phase 2: heightmap generation.
-    roads/              Phase 3: street graph generation.
-    parcels/            Phase 4: block/lot polygon generation.
-    buildings/          Phase 5: building volume generation.
-    project/            Phase 7: flatten the 3D city model to a 2D map description.
+    points/             Phase 2: point-set generation (Poisson-disk + random passes). Not yet scaffolded.
+    mesh/               Phase 2: bounded Voronoi diagram + short-edge collapse. Not yet scaffolded.
+    terrain/            Phase 3: per-point elevation from a height-map image + noise, with local max/min correction.
+    roads/              Phase 4: street graph generation.
+    parcels/            Phase 5: block/lot polygon generation.
+    buildings/          Phase 6: building volume generation.
+    project/            Phase 8: flatten the 3D city model to a 2D map description.
     index.js            Wires the stages above into one pipeline function.
   render/
-    two-d/              Phase 8: draw the flattened 2D map (SVG). Node- and browser-safe.
-    three-d/             Phase 6: optional WebGL preview of the 3D city model. Browser-only.
-  cli/                  Phase 9: Node command-line entry point.
-  web/                  Phase 9: browser page/UI entry point.
+    two-d/              Phase 9: draw the flattened 2D map (5000 x 5000 SVG). Node- and browser-safe.
+    three-d/             Phase 7: optional WebGL preview of the 3D city model. Browser-only.
+  cli/                  Phase 10: Node command-line entry point.
+  web/                  Phase 10: browser page/UI entry point.
 test/                   Tests, mirroring the src/ layout.
 ```
+
+`points/` and `mesh/` are new since the point-mesh design was decided; they
+are not yet created (see phase 0's scaffold — it predates this decision).
+They will be added, as empty stubs like their siblings, at the start of
+phase 2.
 
 ## 9. Coding conventions
 
