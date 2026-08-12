@@ -58,10 +58,12 @@ should not change later, even as fields get added):
   cleanly instead of running to infinity), then cleaned up by collapsing
   any edge shorter than 20 units down to a single point. Building the
   diagram this way also gives the site-adjacency graph for free: which
-  pairs of points are neighbors (their cells share a border). Later stages
-  that compare elevation between two points use this graph — the Voronoi
-  diagram's own corners and borders do not carry elevation, only the
-  original points do.
+  pairs of points are neighbors (their cells share a border), and the
+  Delaunay triangles themselves (each a group of 3 mutually neighboring
+  points) — `coastline` uses both. Later stages that compare elevation
+  between two points use the site-adjacency graph — the Voronoi diagram's
+  own corners and borders do not carry elevation, only the original points
+  do.
 - **terrain → per-point elevation**: an elevation value for every point in
   the mesh. Read from a height-map image supplied by the caller (converted
   to grayscale and normalized to 0–1) sampled at each point's position,
@@ -241,16 +243,17 @@ works — see [PROJECT_PLAN.md](./PROJECT_PLAN.md#8-decisions-made-so-far).
 ```
 docs/                   Project plan and this document.
 scripts/
-  debug-render.js       Dev-only: runs the pipeline through sea-level and writes a debug SVG. Not part of the real pipeline.
+  debug-render.js       Dev-only: runs the full pipeline and writes a debug SVG. Not part of the real pipeline.
+  load-height-map.js    Dev-only: decodes a PNG into terrain's sampleHeight(x, y) function.
 src/
   core/                 Pure generation logic. Node- and browser-safe.
     model/              Phase 1: shared point/edge/cell containers and the city-model bundle. Implemented.
     random/             Phase 1: seeded random source (mulberry32), shared by every stage. Implemented.
     points/             Phase 2: point-set generation (Poisson-disk + random passes). Implemented.
-    mesh/               Phase 2: Voronoi diagram + site-adjacency graph, short-edge collapse. Implemented.
+    mesh/               Phase 2: Voronoi diagram, site-adjacency graph, Delaunay triangles, short-edge collapse. Implemented.
     terrain/            Phase 3: per-point elevation from a height-map sampler + noise, with local max/min correction. Implemented.
     sea-level/          Phase 4: underwater flag + elevation shift so sea level sits at 0. Implemented.
-    coastline/          Phase 5: split edges + new edges forming the coastline at elevation 0. Not yet scaffolded.
+    coastline/          Phase 5: split edges + new edges forming the coastline at elevation 0. Implemented.
     roads/              Phase 6: street graph generation.
     parcels/            Phase 7: block/lot polygon generation.
     buildings/          Phase 8: building volume generation.
@@ -264,8 +267,8 @@ src/
 test/                   Tests, mirroring the src/ layout.
 ```
 
-`coastline/` is still not created — it is the next unimplemented stage. Its
-folder will be added, like its siblings, once phase 5 starts.
+`roads/` is still not created — it is the next unimplemented stage. Its
+folder will be added, like its siblings, once phase 6 starts.
 
 ## 9. Coding conventions
 

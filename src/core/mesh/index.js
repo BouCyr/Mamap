@@ -31,7 +31,16 @@ export function createMesh(points) {
     }
   }
 
-  return { cells, edges };
+  const triangles = [];
+  for (let t = 0; t < delaunay.triangles.length; t += 3) {
+    triangles.push([
+      points[delaunay.triangles[t]],
+      points[delaunay.triangles[t + 1]],
+      points[delaunay.triangles[t + 2]],
+    ]);
+  }
+
+  return { cells, edges, triangles };
 }
 
 // Voronoi cells share vertices with their neighbors. Any shared vertex

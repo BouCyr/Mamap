@@ -1,8 +1,8 @@
-// Temporary dev tool. Runs the pipeline through the sea-level stage and
+// Temporary dev tool. Runs the pipeline through the coastline stage and
 // writes a debug SVG: one filled polygon per Voronoi cell, colored by its
-// point's elevation. Not the real 2D renderer (that's phase 10/11, still
-// unbuilt) - this is only here to see intermediate pipeline output while
-// building it.
+// point's elevation, with the coastline drawn on top. Not the real 2D
+// renderer (that's phase 10/11, still unbuilt) - this is only here to see
+// intermediate pipeline output while building it.
 //
 // Usage: node scripts/debug-render.js [heightMapPath|blank] [seed] [ratio] [outputPath]
 
@@ -12,6 +12,7 @@ import { createPoints } from '../src/core/points/index.js';
 import { createMesh } from '../src/core/mesh/index.js';
 import { applyTerrain } from '../src/core/terrain/index.js';
 import { applySeaLevel } from '../src/core/sea-level/index.js';
+import { createCoastline } from '../src/core/coastline/index.js';
 import { loadHeightMap } from './load-height-map.js';
 
 const heightMapArg = process.argv[2] ?? 'blank';
@@ -29,13 +30,15 @@ const points = createPoints(cityModel);
 const mesh = createMesh(points);
 applyTerrain(points, mesh, sampleHeight, cityModel);
 const seaLevel = applySeaLevel(points, ratio);
+const { coastlineEdges } = createCoastline(points, mesh);
 
-writeFileSync(outputPath, renderDebugSvg(points, mesh));
+writeFileSync(outputPath, renderDebugSvg(points, mesh, coastlineEdges));
 console.log(
-  `wrote ${outputPath} (heightMap ${heightMapArg}, seed ${seed}, ratio ${ratio}, sea level was ${seaLevel.toFixed(4)})`,
+  `wrote ${outputPath} (heightMap ${heightMapArg}, seed ${seed}, ratio ${ratio}, ` +
+    `sea level was ${seaLevel.toFixed(4)}, ${coastlineEdges.length} coastline edges)`,
 );
 
-function renderDebugSvg(points, mesh) {
+function renderDebugSvg(points, mesh, coastlineEdges) {
   const zValues = points.map((point) => point.z);
   const minZ = Math.min(...zValues);
   const maxZ = Math.max(...zValues);
@@ -48,9 +51,17 @@ function renderDebugSvg(points, mesh) {
     })
     .join('\n');
 
+  const coastline = coastlineEdges
+    .map(
+      (edge) =>
+        `  <line x1="${edge.a.x.toFixed(1)}" y1="${edge.a.y.toFixed(1)}" x2="${edge.b.x.toFixed(1)}" y2="${edge.b.y.toFixed(1)}" stroke="#ffffff" stroke-width="6" />`,
+    )
+    .join('\n');
+
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${MAP_SIZE}" height="${MAP_SIZE}" viewBox="0 0 ${MAP_SIZE} ${MAP_SIZE}">`,
     polygons,
+    coastline,
     '</svg>',
     '',
   ].join('\n');

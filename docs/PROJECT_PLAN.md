@@ -67,17 +67,17 @@ So the pipeline is: **parameters → 3D city model → flattened 2D map.**
 
 ## 5. Current status
 
-Phases 1–4 are implemented: the shared point/edge/cell containers and
+Phases 1–5 are implemented: the shared point/edge/cell containers and
 seeded random source (`src/core/model/`, `src/core/random/`), point-set
 generation (`src/core/points/`), the bounded Voronoi mesh
-(`src/core/mesh/`), terrain elevation (`src/core/terrain/`), and sea level
-(`src/core/sea-level/`), with tests for each in `test/core/`. A throwaway
-dev script, `scripts/debug-render.js`, runs the pipeline through
-sea-level and writes a debug SVG (filled Voronoi cells colored by
-elevation) — not the real renderer, just a way to see intermediate
-output.
+(`src/core/mesh/`), terrain elevation (`src/core/terrain/`), sea level
+(`src/core/sea-level/`), and the coastline (`src/core/coastline/`), with
+tests for each in `test/core/`. A throwaway dev script,
+`scripts/debug-render.js`, runs the full pipeline and writes a debug SVG
+(filled Voronoi cells colored by elevation, coastline drawn on top) — not
+the real renderer, just a way to see intermediate output.
 
-Phase 5 (coastline) onward is not implemented yet. See
+Phase 6 (roads) onward is not implemented yet. See
 [ARCHITECTURE.md](./ARCHITECTURE.md) for the module layout and data
 contracts each later piece will follow.
 

@@ -33,3 +33,18 @@ test('has no duplicate edges between the same pair of points', () => {
     seen.add(key);
   }
 });
+
+test('createMesh returns the Delaunay triangles as point triples', () => {
+  const points = createPoints(createCityModel(1));
+  const { triangles } = createMesh(points);
+
+  assert.ok(triangles.length > 0);
+  for (const triangle of triangles) {
+    assert.equal(triangle.length, 3);
+    const [a, b, c] = triangle;
+    assert.ok(points.includes(a) && points.includes(b) && points.includes(c));
+    assert.notEqual(a, b);
+    assert.notEqual(b, c);
+    assert.notEqual(a, c);
+  }
+});
