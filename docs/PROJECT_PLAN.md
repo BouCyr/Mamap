@@ -67,9 +67,12 @@ So the pipeline is: **parameters → 3D city model → flattened 2D map.**
 
 ## 5. Current status
 
-Scaffold stage. Folder layout and documentation only — no generation logic
-yet. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the module layout and data
-contracts each piece will follow once implementation starts.
+Phase 1 (core data model) is implemented: the shared point/edge/cell
+containers and the seeded random source live in `src/core/model/` and
+`src/core/random/`, with tests in `test/core/`. Phases 2 onward (point
+mesh, terrain, ...) are not implemented yet. See
+[ARCHITECTURE.md](./ARCHITECTURE.md) for the module layout and data
+contracts each later piece will follow.
 
 ## 6. Phased plan
 

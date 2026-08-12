@@ -12,8 +12,12 @@ or from a browser page with a small UI.
 
 ## Status
 
-Scaffold stage: folder layout and documentation only. No generation code has
-been written yet.
+Phase 1 (core data model) is implemented: shared point/edge/cell containers
+and a seeded random source, with tests. Phases 2 onward (point mesh,
+terrain, ...) are not implemented yet — see
+[docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for the roadmap.
+
+Run the tests with `npm test`.
 
 ## Documentation
 

@@ -44,8 +44,9 @@ seed + params
     -> project    -> flattened 2D map description            (uses everything above)
 ```
 
-Planned shape of each hand-off (exact fields will firm up in phase 1, but the
-kind of object each stage produces should not change later):
+Planned shape of each hand-off, built on the point/edge/cell containers
+`core/model` settled in phase 1 (the kind of object each stage produces
+should not change later, even as fields get added):
 
 - **points → point set**: locations covering the 5000 × 5000 map, built in
   two passes: 500 points from an even, minimum-spacing pass (Poisson-disk
@@ -119,9 +120,15 @@ argument — it never reaches for `Math.random()` directly. The only inputs
 that can change a generated city are the seed and the supplied height-map
 image: the same seed with the same height-map image always produces the
 same city, with nothing else feeding in randomness anywhere in the
-pipeline. The seeded-RNG choice itself is a small, self-contained utility
-(arguably the one piece of "randomness math" simple enough to write
-in-house rather than pull in as a dependency); this gets settled in phase 1.
+pipeline.
+
+`core/random` implements this as mulberry32, a small, self-contained
+pseudo-random number generator — one piece of "randomness math" simple
+enough to write in-house rather than pull in as a dependency.
+`createCityModel` (in `core/model`) creates one instance from the city's
+seed and stores it on the city model as `random`; every stage that needs
+randomness reads it from there, rather than creating its own, so there is
+exactly one shared source per city.
 
 ## 4. Rendering
 
@@ -226,6 +233,8 @@ works — see [PROJECT_PLAN.md](./PROJECT_PLAN.md#8-decisions-made-so-far).
 docs/                   Project plan and this document.
 src/
   core/                 Pure generation logic. Node- and browser-safe.
+    model/              Phase 1: shared point/edge/cell containers and the city-model bundle. Implemented.
+    random/             Phase 1: seeded random source (mulberry32), shared by every stage. Implemented.
     points/             Phase 2: point-set generation (Poisson-disk + random passes). Not yet scaffolded.
     mesh/               Phase 2: Voronoi diagram + site-adjacency graph, short-edge collapse. Not yet scaffolded.
     terrain/            Phase 3: per-point elevation from a height-map image + noise, with local max/min correction.

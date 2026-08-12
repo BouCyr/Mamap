@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "echo \"Not implemented yet. See docs/PROJECT_PLAN.md.\" && exit 1",
-    "test": "echo \"Not implemented yet. See docs/PROJECT_PLAN.md.\" && exit 1"
+    "test": "node --test"
   },
   "dependencies": {},
   "devDependencies": {}
