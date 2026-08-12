@@ -20,9 +20,7 @@ export function createCoastline(points, mesh) {
     const key = crossingKey(a, b);
     let point = crossingPoints.get(key);
     if (!point) {
-      const t = a.z / (a.z - b.z);
-      point = createPoint(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
-      point.z = 0;
+      point = computeCrossingPoint(a, b);
       crossingPoints.set(key, point);
     }
     return point;
@@ -56,6 +54,24 @@ export function createCoastline(points, mesh) {
   return { edges, coastlineEdges };
 }
 
-function crossesSeaLevel(a, b) {
+/**
+ * Whether two mesh points sit on opposite sides of sea level (z = 0).
+ * @param {{z: number}} a
+ * @param {{z: number}} b
+ */
+export function crossesSeaLevel(a, b) {
   return (a.z > 0 && b.z < 0) || (a.z < 0 && b.z > 0);
+}
+
+/**
+ * The point on segment a-b where elevation crosses 0, found by linear
+ * interpolation between the two points' elevations.
+ * @param {{x: number, y: number, z: number}} a
+ * @param {{x: number, y: number, z: number}} b
+ */
+export function computeCrossingPoint(a, b) {
+  const t = a.z / (a.z - b.z);
+  const point = createPoint(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+  point.z = 0;
+  return point;
 }

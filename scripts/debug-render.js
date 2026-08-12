@@ -1,8 +1,12 @@
 // Temporary dev tool. Runs the pipeline through the coastline stage and
-// writes a debug SVG: one filled polygon per Voronoi cell, colored by its
-// point's elevation, with the coastline drawn on top. Not the real 2D
-// renderer (that's phase 10/11, still unbuilt) - this is only here to see
-// intermediate pipeline output while building it.
+// writes a debug SVG: one filled polygon per Delaunay triangle, colored by
+// the elevation of its corners, with the coastline drawn on top. Any
+// triangle the coastline runs through is split into its land part and its
+// sea part first, each colored on its own side - this is what keeps the
+// fill from showing land past the coastline into the sea, or the other way
+// round, since the fill boundary and the coastline line are the same line.
+// Not the real 2D renderer (that's phase 10/11, still unbuilt) - this is
+// only here to see intermediate pipeline output while building it.
 //
 // Usage: node scripts/debug-render.js [heightMapPath|blank] [seed] [ratio] [outputPath]
 
@@ -12,7 +16,7 @@ import { createPoints } from '../src/core/points/index.js';
 import { createMesh } from '../src/core/mesh/index.js';
 import { applyTerrain } from '../src/core/terrain/index.js';
 import { applySeaLevel } from '../src/core/sea-level/index.js';
-import { createCoastline } from '../src/core/coastline/index.js';
+import { createCoastline, crossesSeaLevel, computeCrossingPoint } from '../src/core/coastline/index.js';
 import { loadHeightMap } from './load-height-map.js';
 
 const heightMapArg = process.argv[2] ?? 'blank';
@@ -43,11 +47,12 @@ function renderDebugSvg(points, mesh, coastlineEdges) {
   const minZ = Math.min(...zValues);
   const maxZ = Math.max(...zValues);
 
-  const polygons = mesh.cells
-    .map((cell, i) => {
-      const color = colorForElevation(points[i].z, minZ, maxZ);
-      const vertices = cell.vertices.map((v) => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(' ');
-      return `  <polygon points="${vertices}" fill="${color}" stroke="#00000022" />`;
+  const polygons = mesh.triangles
+    .flatMap(splitTriangleByCoastline)
+    .map(({ vertices, z }) => {
+      const color = colorForElevation(z, minZ, maxZ);
+      const coords = vertices.map((v) => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(' ');
+      return `  <polygon points="${coords}" fill="${color}" stroke="${color}" />`;
     })
     .join('\n');
 
@@ -65,6 +70,46 @@ function renderDebugSvg(points, mesh, coastlineEdges) {
     '</svg>',
     '',
   ].join('\n');
+}
+
+// A triangle entirely above or below sea level renders as one flat polygon.
+// A triangle with one corner on the opposite side from the other two is cut
+// at the two points where its sides cross sea level, into a small triangle
+// (the lone corner) and a quad (the other two corners) - the same crossing
+// points createCoastline uses to draw the coastline itself, so the two
+// fills meet exactly on that line instead of over- or under-shooting it.
+function splitTriangleByCoastline(triangle) {
+  const [p0, p1, p2] = triangle;
+  const crossingSides = [
+    [p0, p1],
+    [p1, p2],
+    [p2, p0],
+  ].filter(([a, b]) => crossesSeaLevel(a, b));
+
+  if (crossingSides.length === 0) {
+    return [{ vertices: triangle, z: (p0.z + p1.z + p2.z) / 3 }];
+  }
+
+  const isLand = (p) => p.z > 0;
+  const landCount = triangle.filter(isLand).length;
+  const loneIsLand = landCount === 1;
+  const loneIndex = triangle.findIndex((p) => isLand(p) === loneIsLand);
+  const [lone, otherA, otherB] = [
+    triangle[loneIndex],
+    triangle[(loneIndex + 1) % 3],
+    triangle[(loneIndex + 2) % 3],
+  ];
+
+  const crossingLoneA = computeCrossingPoint(lone, otherA);
+  const crossingOtherBLone = computeCrossingPoint(otherB, lone);
+
+  return [
+    { vertices: [crossingOtherBLone, lone, crossingLoneA], z: lone.z },
+    {
+      vertices: [crossingLoneA, otherA, otherB, crossingOtherBLone],
+      z: (otherA.z + otherB.z) / 2,
+    },
+  ];
 }
 
 function colorForElevation(z, minZ, maxZ) {
