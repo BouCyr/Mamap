@@ -4,7 +4,7 @@
 // unbuilt) - this is only here to see intermediate pipeline output while
 // building it.
 //
-// Usage: node scripts/debug-render.js [seed] [ratio] [outputPath]
+// Usage: node scripts/debug-render.js [heightMapPath|blank] [seed] [ratio] [outputPath]
 
 import { writeFileSync } from 'node:fs';
 import { createCityModel, MAP_SIZE } from '../src/core/model/index.js';
@@ -12,23 +12,28 @@ import { createPoints } from '../src/core/points/index.js';
 import { createMesh } from '../src/core/mesh/index.js';
 import { applyTerrain } from '../src/core/terrain/index.js';
 import { applySeaLevel } from '../src/core/sea-level/index.js';
+import { loadHeightMap } from './load-height-map.js';
 
-const seed = Number(process.argv[2] ?? 1);
-const ratio = Number(process.argv[3] ?? 0.33);
-const outputPath = process.argv[4] ?? 'debug-map.svg';
+const heightMapArg = process.argv[2] ?? 'blank';
+const seed = Number(process.argv[3] ?? 1);
+const ratio = Number(process.argv[4] ?? 0.33);
+const outputPath = process.argv[5] ?? 'debug-map.svg';
 
-// A blank height-map: every point starts at the same mid-grey value, so
-// elevation comes only from the noise factor applied on top of it.
-const blankHeightMap = () => 0.5;
+// "blank" is every point starting at the same mid-grey value, so elevation
+// comes only from the noise factor applied on top of it. Anything else is
+// read as a path to a real PNG height-map image.
+const sampleHeight = heightMapArg === 'blank' ? () => 0.5 : loadHeightMap(heightMapArg);
 
 const cityModel = createCityModel(seed);
 const points = createPoints(cityModel);
 const mesh = createMesh(points);
-applyTerrain(points, mesh, blankHeightMap, cityModel);
+applyTerrain(points, mesh, sampleHeight, cityModel);
 const seaLevel = applySeaLevel(points, ratio);
 
 writeFileSync(outputPath, renderDebugSvg(points, mesh));
-console.log(`wrote ${outputPath} (seed ${seed}, ratio ${ratio}, sea level was ${seaLevel.toFixed(4)})`);
+console.log(
+  `wrote ${outputPath} (heightMap ${heightMapArg}, seed ${seed}, ratio ${ratio}, sea level was ${seaLevel.toFixed(4)})`,
+);
 
 function renderDebugSvg(points, mesh) {
   const zValues = points.map((point) => point.z);
