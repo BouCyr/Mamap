@@ -109,7 +109,7 @@ kind of object each stage produces should not change later):
 A city model is the bundle of every stage's output kept together (point set +
 mesh + elevation + underwater flags + coastline + street graph + parcels +
 buildings), plus the seed and parameters that made it. This bundle is what
-phase 9's 3D preview reads from; the flattened 2D map description is a
+phase 12's 3D preview reads from; the flattened 2D map description is a
 derived, separate object, not a replacement for it.
 
 ## 3. Determinism
@@ -130,10 +130,11 @@ Two separate renderers consume `core`'s output, for two separate purposes:
 - **`src/render/two-d/`** — turns the flattened 2D map description into the
   actual map. This is the final deliverable and must work in both
   environments:
-  - In the browser: draw into the page (e.g. build an `<svg>` and attach it,
-    or draw into a `<canvas>`).
   - In Node: produce the same description as a string/file (e.g. an `.svg`
-    file), with no DOM involved.
+    file), with no DOM involved. Built first (phase 10), as part of the
+    Node/CLI priority path.
+  - In the browser: draw into the page (e.g. build an `<svg>` and attach it,
+    or draw into a `<canvas>`). Added later, with the web UI (phase 13).
 
   Decided: emit an **SVG**, sized 5000 × 5000 to match the map extent.
   Building an SVG is just assembling elements/strings — no image encoding,
@@ -143,11 +144,12 @@ Two separate renderers consume `core`'s output, for two separate purposes:
   later, can be a "take the SVG, rasterize it" post-step rather than a
   second renderer.
 
-- **`src/render/three-d/`** — the optional 3D preview from phase 9. Browser
+- **`src/render/three-d/`** — the optional 3D preview from phase 12. Browser
   only (needs a `<canvas>` and a WebGL context; there is nothing to preview
   onto in Node). Uses raw WebGL, not a 3D engine library, to stay in line
   with the "no framework" rule. In Node, this module is simply never
-  imported.
+  imported. Deferred until the Node/CLI path (phases 1–11) works — see
+  [PROJECT_PLAN.md](./PROJECT_PLAN.md#8-decisions-made-so-far).
 
 Rendering code reads the city model; it never mutates it and never invents
 data the earlier pipeline stages should have produced (e.g. the 2D renderer
@@ -155,15 +157,17 @@ should not be deciding building heights — that is `buildings`' job).
 
 ## 5. Running it: Node and browser entry points
 
-- **`src/cli/`** — a small Node entry point. Takes parameters (seed, size,
-  etc.), runs the `core` pipeline, runs `render/two-d` in its Node mode, and
-  writes the result to a file. This is the "server-side" way to run the
-  generator — no UI, no browser required.
-- **`src/web/`** — a small browser page: a form for the seed/parameters, a
-  "generate" button, and a spot to show the result. Calls the exact same
-  `core` pipeline (imported as an ES module) and the same `render/two-d`
-  code, just in its browser mode. May optionally offer the phase 9 3D
-  preview alongside the 2D result.
+- **`src/cli/`** — a small Node entry point (phase 11). Takes parameters
+  (seed, height-map image path, ratio, etc.), runs the `core` pipeline,
+  runs `render/two-d` in its Node mode, and writes the result to a file.
+  This is the "server-side" way to run the generator — no UI, no browser
+  required — and it is the priority target: see
+  [PROJECT_PLAN.md](./PROJECT_PLAN.md#8-decisions-made-so-far).
+- **`src/web/`** — a small browser page (phase 13, deferred until the CLI
+  works): a form for the seed/parameters, a "generate" button, and a spot
+  to show the result. Calls the exact same `core` pipeline (imported as an
+  ES module) and the same `render/two-d` code, just in its browser mode.
+  May optionally offer the phase 12 3D preview alongside the 2D result.
 
 Neither entry point contains generation logic of its own — they only wire
 parameters in and rendered output out.
@@ -190,7 +194,7 @@ parameters in and rendered output out.
     Node-side adapter that reads the height-map image file into raw pixel
     values (see section 2) — not needed in the browser, which can decode
     images with a `<canvas>` and no extra dependency.
-  - **Vector/matrix math** (phase 8/9): 3D vector, matrix, and quaternion
+  - **Vector/matrix math** (phase 8/12): 3D vector, matrix, and quaternion
     helpers for building volumes and the WebGL preview camera.
   Each will be picked, justified in a short note, and pinned when its phase
   actually starts.
@@ -212,9 +216,9 @@ framework-free:
   dev dependency, not a runtime one, and does not change how `core` itself
   is written.
 
-Current lean is import maps, since it needs no extra tool at all. This should
-be confirmed once phase 2 or 3 actually picks a first real dependency and we
-see how well it works in practice.
+Current lean is import maps, since it needs no extra tool at all. This is
+deferred, along with the rest of the browser UI, until the Node/CLI path
+works — see [PROJECT_PLAN.md](./PROJECT_PLAN.md#8-decisions-made-so-far).
 
 ## 8. Folder layout
 
@@ -230,13 +234,13 @@ src/
     roads/              Phase 6: street graph generation.
     parcels/            Phase 7: block/lot polygon generation.
     buildings/          Phase 8: building volume generation.
-    project/            Phase 10: flatten the 3D city model to a 2D map description.
+    project/            Phase 9: flatten the 3D city model to a 2D map description.
     index.js            Wires the stages above into one pipeline function.
   render/
-    two-d/              Phase 11: draw the flattened 2D map (5000 x 5000 SVG). Node- and browser-safe.
-    three-d/             Phase 9: optional WebGL preview of the 3D city model. Browser-only.
-  cli/                  Phase 12: Node command-line entry point.
-  web/                  Phase 12: browser page/UI entry point.
+    two-d/              Phase 10: draw the flattened 2D map (5000 x 5000 SVG). Node mode first, browser mode with phase 13.
+    three-d/             Phase 12: optional WebGL preview of the 3D city model. Browser-only, deferred.
+  cli/                  Phase 11: Node command-line entry point. The priority path.
+  web/                  Phase 13: browser page/UI entry point. Deferred.
 test/                   Tests, mirroring the src/ layout.
 ```
 

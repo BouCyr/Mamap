@@ -1,4 +1,4 @@
-// Projection stage (see docs/PROJECT_PLAN.md, phase 10).
+// Projection stage (see docs/PROJECT_PLAN.md, phase 9).
 //
 // Flattens the full 3D city model (point mesh + elevation + street graph +
 // parcels + buildings) into a 2D map description: lines, polygons, and

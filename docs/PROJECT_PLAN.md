@@ -87,14 +87,21 @@ if rough.
 | 6 | Road network | A graph of streets laid over the mesh: a small number of main roads, then a filled-in grid/organic network of minor streets, blocked by terrain (and water) where needed. |
 | 7 | Parcels & blocks | The area between streets is split into blocks, and blocks into parcels (individual building lots). |
 | 8 | Buildings (3D massing) | Each parcel gets a simple building volume: footprint plus height, maybe a basic roof shape. This is the last step of the 3D model. |
-| 9 | 3D preview (browser) | A minimal WebGL viewer that shows the generated 3D model (terrain + roads + building blocks), so the generator's output can be sanity-checked visually. Browser-only; not the final deliverable. |
-| 10 | Projection (3D → 2D) | Flatten the 3D city model into a 2D map description: road lines with widths, block/parcel outlines, building footprints with a fill derived from height or type. |
-| 11 | 2D map rendering | Turn the flattened 2D description into the final 5000 × 5000 SVG map: colors, line weights, a simple legend/style. Must work both as a file written from Node and as an on-screen result in the browser. |
-| 12 | UI & CLI polish | Simple browser form (seed + a few parameters + "generate" button) around phase 11's output, and an equivalent Node CLI entry point. Export to a file from either side. |
-| 13 | Tuning pass | No new features — revisit parameters and defaults so generated cities look good across a range of seeds. |
+| 9 | Projection (3D → 2D) | Flatten the 3D city model into a 2D map description: road lines with widths, block/parcel outlines, building footprints with a fill derived from height or type. |
+| 10 | 2D map rendering | Turn the flattened 2D description into the final 5000 × 5000 SVG map: colors, line weights, a simple legend/style. Built first as a file written from Node; the on-screen, in-browser version comes with phase 13. |
+| 11 | CLI | A Node command-line entry point: takes parameters (seed, height-map image path, ratio, ...), runs the full pipeline, and writes the SVG to a file. This is the first fully working, end-to-end deliverable. |
+| 12 | 3D preview (browser) | A minimal WebGL viewer that shows the generated 3D model (terrain + roads + building blocks), so the generator's output can be sanity-checked visually. Browser-only; not the final deliverable; deferred until phase 11 works. |
+| 13 | Web UI | A simple browser form (seed + a few parameters + "generate" button) around phase 10's SVG output, shown on screen instead of (or as well as) written to a file. |
+| 14 | Tuning pass | No new features — revisit parameters and defaults so generated cities look good across a range of seeds. |
 
 Phases are meant to be done roughly in order, but a phase can be revisited
 once a later phase reveals its output isn't quite the right shape.
+
+**Node/server first**: phases 1–11 are the priority path and require no
+browser at all — a working Node CLI that turns a seed and a height-map
+image into an SVG file is the first real milestone. Phases 12 (3D preview)
+and 13 (web UI) are both browser-only and are deferred until that path
+works end-to-end.
 
 ## 7. Success criteria
 
@@ -140,6 +147,9 @@ once a later phase reveals its output isn't quite the right shape.
   seed and the supplied height-map image — no other hidden source of
   randomness anywhere in the pipeline. The same seed with the same
   height-map image always produces the same city.
+- **Implementation priority**: get the Node/CLI path (phases 1–11) fully
+  working end-to-end — seed and height-map image in, SVG file out — before
+  starting the browser-only phases (12: 3D preview, 13: web UI).
 
 ## 9. Open questions
 
