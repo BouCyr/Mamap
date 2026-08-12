@@ -1,4 +1,4 @@
-// Node command-line entry point (see docs/PROJECT_PLAN.md, phase 10, and
+// Node command-line entry point (see docs/PROJECT_PLAN.md, phase 11, and
 // docs/ARCHITECTURE.md, section 5).
 //
 // Will take parameters (seed, size, ...), run the core pipeline, run

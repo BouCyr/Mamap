@@ -1,4 +1,4 @@
-// 2D map rendering (see docs/PROJECT_PLAN.md, phase 9, and
+// 2D map rendering (see docs/PROJECT_PLAN.md, phase 10, and
 // docs/ARCHITECTURE.md, section 4).
 //
 // Takes the flattened 2D map description (core/project's output) and turns

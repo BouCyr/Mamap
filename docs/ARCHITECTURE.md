@@ -36,7 +36,8 @@ seed + params
     -> points     -> point set
     -> mesh       -> bounded Voronoi diagram, cleaned up   (uses point set)
     -> terrain    -> per-point elevation                    (uses mesh)
-    -> roads      -> street graph                           (uses mesh + elevation)
+    -> sea-level  -> corrected elevation + underwater flag  (uses elevation)
+    -> roads      -> street graph                           (uses mesh + elevation + underwater flag)
     -> parcels    -> block/lot polygons                     (uses street graph, mesh)
     -> buildings  -> building volumes                       (uses parcels + elevation)
     -> project    -> flattened 2D map description           (uses everything above)
@@ -65,9 +66,15 @@ kind of object each stage produces should not change later):
   in Node) and happens outside `core`. `core/terrain` itself only ever
   receives already-decoded grayscale data (a plain grid of 0–1 numbers), not
   an image file or a DOM `Image` object — this is what keeps it portable.
-- **roads → street graph**: nodes (mesh points, with elevation) and edges (a
-  road segment between two nodes, with a width/class: e.g. main road vs.
-  minor street).
+- **sea-level → corrected elevation + underwater flag**: takes a ratio
+  parameter (e.g. 33%) and the raw per-point elevation from `terrain`. The
+  lowest-elevation points, by count, up to that ratio of the total point
+  count, are marked underwater. Sea level is set to the highest elevation
+  among those underwater points, then every point's elevation is shifted by
+  that amount, so sea level always ends up at 0.
+- **roads → street graph**: nodes (mesh points, with elevation and the
+  underwater flag) and edges (a road segment between two nodes, with a
+  width/class: e.g. main road vs. minor street).
 - **parcels → block/lot polygons**: closed polygons carved out of the space
   between road edges, each tagged with the block it belongs to. Whether this
   reuses the mesh's Voronoi cells directly is still open — see
@@ -79,10 +86,10 @@ kind of object each stage produces should not change later):
   detail left in it. This is the boundary between `core` and rendering.
 
 A city model is the bundle of every stage's output kept together (point set +
-mesh + elevation + street graph + parcels + buildings), plus the seed and
-parameters that made it. This bundle is what phase 7's 3D preview reads
-from; the flattened 2D map description is a derived, separate object, not a
-replacement for it.
+mesh + elevation + underwater flags + street graph + parcels + buildings),
+plus the seed and parameters that made it. This bundle is what phase 8's 3D
+preview reads from; the flattened 2D map description is a derived, separate
+object, not a replacement for it.
 
 ## 3. Determinism
 
@@ -112,7 +119,7 @@ Two separate renderers consume `core`'s output, for two separate purposes:
   later, can be a "take the SVG, rasterize it" post-step rather than a
   second renderer.
 
-- **`src/render/three-d/`** — the optional 3D preview from phase 7. Browser
+- **`src/render/three-d/`** — the optional 3D preview from phase 8. Browser
   only (needs a `<canvas>` and a WebGL context; there is nothing to preview
   onto in Node). Uses raw WebGL, not a 3D engine library, to stay in line
   with the "no framework" rule. In Node, this module is simply never
@@ -131,7 +138,7 @@ should not be deciding building heights — that is `buildings`' job).
 - **`src/web/`** — a small browser page: a form for the seed/parameters, a
   "generate" button, and a spot to show the result. Calls the exact same
   `core` pipeline (imported as an ES module) and the same `render/two-d`
-  code, just in its browser mode. May optionally offer the phase 7 3D
+  code, just in its browser mode. May optionally offer the phase 8 3D
   preview alongside the 2D result.
 
 Neither entry point contains generation logic of its own — they only wire
@@ -160,7 +167,7 @@ parameters in and rendered output out.
     Node-side adapter that reads the height-map image file into raw pixel
     values (see section 2) — not needed in the browser, which can decode
     images with a `<canvas>` and no extra dependency.
-  - **Vector/matrix math** (phase 6/7): 3D vector, matrix, and quaternion
+  - **Vector/matrix math** (phase 7/8): 3D vector, matrix, and quaternion
     helpers for building volumes and the WebGL preview camera.
   Each will be picked, justified in a short note, and pinned when its phase
   actually starts.
@@ -195,23 +202,24 @@ src/
     points/             Phase 2: point-set generation (Poisson-disk + random passes). Not yet scaffolded.
     mesh/               Phase 2: bounded Voronoi diagram + short-edge collapse. Not yet scaffolded.
     terrain/            Phase 3: per-point elevation from a height-map image + noise, with local max/min correction.
-    roads/              Phase 4: street graph generation.
-    parcels/            Phase 5: block/lot polygon generation.
-    buildings/          Phase 6: building volume generation.
-    project/            Phase 8: flatten the 3D city model to a 2D map description.
+    sea-level/          Phase 4: underwater flag + elevation shift so sea level sits at 0. Not yet scaffolded.
+    roads/              Phase 5: street graph generation.
+    parcels/            Phase 6: block/lot polygon generation.
+    buildings/          Phase 7: building volume generation.
+    project/            Phase 9: flatten the 3D city model to a 2D map description.
     index.js            Wires the stages above into one pipeline function.
   render/
-    two-d/              Phase 9: draw the flattened 2D map (5000 x 5000 SVG). Node- and browser-safe.
-    three-d/             Phase 7: optional WebGL preview of the 3D city model. Browser-only.
-  cli/                  Phase 10: Node command-line entry point.
-  web/                  Phase 10: browser page/UI entry point.
+    two-d/              Phase 10: draw the flattened 2D map (5000 x 5000 SVG). Node- and browser-safe.
+    three-d/             Phase 8: optional WebGL preview of the 3D city model. Browser-only.
+  cli/                  Phase 11: Node command-line entry point.
+  web/                  Phase 11: browser page/UI entry point.
 test/                   Tests, mirroring the src/ layout.
 ```
 
-`points/` and `mesh/` are new since the point-mesh design was decided; they
-are not yet created (see phase 0's scaffold — it predates this decision).
-They will be added, as empty stubs like their siblings, at the start of
-phase 2.
+`points/`, `mesh/`, and `sea-level/` are new since those stages were
+decided; they are not yet created (see phase 0's scaffold — it predates
+these decisions). They will be added, as empty stubs like their siblings,
+at the start of their phase.
 
 ## 9. Coding conventions
 

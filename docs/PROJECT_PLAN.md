@@ -82,14 +82,15 @@ if rough.
 | 1 | Core data model | Shared types/shapes used by every later module: point, edge, cell/polygon, and the city-model object that gets passed between stages. No generation yet, just the containers. |
 | 2 | Point mesh | A set of points covering the map, built in two passes: an even, minimum-spacing pass (Poisson-disk sampling), then a plain random pass (extra points with no spacing rule). A Voronoi diagram is then built from those points and clipped to the map's bounds. A cleanup pass collapses any diagram edge shorter than a set threshold down to a single point. |
 | 3 | Terrain / elevation | An elevation value for every point in the mesh. Read from a height-map image (any image, converted to grayscale and normalized to 0–1), sampled at each point's position, with noise added on top. A correction pass then flattens any point that ended up as a strict local maximum or minimum among its mesh neighbors, unless that point sits on the edge of the map. |
-| 4 | Road network | A graph of streets laid over the mesh: a small number of main roads, then a filled-in grid/organic network of minor streets, blocked by terrain where needed. |
-| 5 | Parcels & blocks | The area between streets is split into blocks, and blocks into parcels (individual building lots). |
-| 6 | Buildings (3D massing) | Each parcel gets a simple building volume: footprint plus height, maybe a basic roof shape. This is the last step of the 3D model. |
-| 7 | 3D preview (browser) | A minimal WebGL viewer that shows the generated 3D model (terrain + roads + building blocks), so the generator's output can be sanity-checked visually. Browser-only; not the final deliverable. |
-| 8 | Projection (3D → 2D) | Flatten the 3D city model into a 2D map description: road lines with widths, block/parcel outlines, building footprints with a fill derived from height or type. |
-| 9 | 2D map rendering | Turn the flattened 2D description into the final 5000 × 5000 SVG map: colors, line weights, a simple legend/style. Must work both as a file written from Node and as an on-screen result in the browser. |
-| 10 | UI & CLI polish | Simple browser form (seed + a few parameters + "generate" button) around phase 9's output, and an equivalent Node CLI entry point. Export to a file from either side. |
-| 11 | Tuning pass | No new features — revisit parameters and defaults so generated cities look good across a range of seeds. |
+| 4 | Sea level | Given a ratio (e.g. 33%), the lowest-elevation ratio of points, by count, are marked underwater. Sea level is set to the highest elevation among those underwater points. Every point's elevation is then shifted by that amount, so sea level sits at 0. |
+| 5 | Road network | A graph of streets laid over the mesh: a small number of main roads, then a filled-in grid/organic network of minor streets, blocked by terrain (and water) where needed. |
+| 6 | Parcels & blocks | The area between streets is split into blocks, and blocks into parcels (individual building lots). |
+| 7 | Buildings (3D massing) | Each parcel gets a simple building volume: footprint plus height, maybe a basic roof shape. This is the last step of the 3D model. |
+| 8 | 3D preview (browser) | A minimal WebGL viewer that shows the generated 3D model (terrain + roads + building blocks), so the generator's output can be sanity-checked visually. Browser-only; not the final deliverable. |
+| 9 | Projection (3D → 2D) | Flatten the 3D city model into a 2D map description: road lines with widths, block/parcel outlines, building footprints with a fill derived from height or type. |
+| 10 | 2D map rendering | Turn the flattened 2D description into the final 5000 × 5000 SVG map: colors, line weights, a simple legend/style. Must work both as a file written from Node and as an on-screen result in the browser. |
+| 11 | UI & CLI polish | Simple browser form (seed + a few parameters + "generate" button) around phase 10's output, and an equivalent Node CLI entry point. Export to a file from either side. |
+| 12 | Tuning pass | No new features — revisit parameters and defaults so generated cities look good across a range of seeds. |
 
 Phases are meant to be done roughly in order, but a phase can be revisited
 once a later phase reveals its output isn't quite the right shape.
@@ -136,9 +137,13 @@ the phase that needs them:
   elevation is chosen (e.g. the average of its mesh neighbors) and how
   "neighbor" is defined (points joined by a surviving Voronoi edge). Decide
   by phase 3.
+- **Sea-level ratio default**: 33% was given as an example, not necessarily
+  the default. What ratio applies when a generation request does not set
+  one? Decide by phase 4.
 - **How later phases use the mesh**: does a Voronoi cell become a parcel?
-  Does a Voronoi edge become a candidate road? Not yet decided — will be
-  settled when phases 4–5 start.
+  Does a Voronoi edge become a candidate road? Does an underwater point mean
+  its whole Voronoi cell is water? Not yet decided — will be settled when
+  phases 5–6 start.
 - **Browser dependency delivery**: how npm packages reach the browser without
   a bundler (import maps vs. a small dev-only build step). See
   [ARCHITECTURE.md](./ARCHITECTURE.md#7-dependency-delivery-browser).
