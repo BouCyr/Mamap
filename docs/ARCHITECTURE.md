@@ -48,24 +48,28 @@ Planned shape of each hand-off (exact fields will firm up in phase 1, but the
 kind of object each stage produces should not change later):
 
 - **points → point set**: locations covering the 5000 × 5000 map, built in
-  two passes: an even, minimum-spacing pass (Poisson-disk sampling), then a
-  plain random pass (extra points, no spacing rule). The mix gives the mesh
-  an even base plus some irregular variation.
+  two passes: 500 points from an even, minimum-spacing pass (Poisson-disk
+  sampling), then 500 points from a plain random pass (no spacing rule) —
+  1000 points total. The mix gives the mesh an even base plus some
+  irregular variation.
 - **mesh → Voronoi diagram + site-adjacency graph**: the Voronoi diagram of
   the point set, clipped to the map's bounds (so border cells are cut off
   cleanly instead of running to infinity), then cleaned up by collapsing
-  any edge shorter than a set threshold down to a single point. Building
-  the diagram this way also gives the site-adjacency graph for free: which
+  any edge shorter than 20 units down to a single point. Building the
+  diagram this way also gives the site-adjacency graph for free: which
   pairs of points are neighbors (their cells share a border). Later stages
   that compare elevation between two points use this graph — the Voronoi
   diagram's own corners and borders do not carry elevation, only the
   original points do.
 - **terrain → per-point elevation**: an elevation value for every point in
-  the mesh. Read from a height-map image (any image, converted to grayscale
-  and normalized to 0–1) sampled at each point's position, with noise added
-  on top. A correction pass then flattens any point that ended up as a
-  strict local maximum or minimum among its mesh neighbors, unless that
-  point sits on the edge of the map.
+  the mesh. Read from a height-map image supplied by the caller (converted
+  to grayscale and normalized to 0–1) sampled at each point's position,
+  then multiplied by a factor from Simplex noise remapped to the range
+  0.8–1.2 (`elevation = heightMapValue * factor`). A correction pass then
+  flattens any point that ended up as a strict local maximum or minimum
+  among its neighbors (points connected by a surviving Voronoi edge —
+  see `mesh` above), replacing it with the average of those neighbors'
+  elevations, unless that point sits on the edge of the map.
 
   Decoding the height-map image file into raw pixel values is
   platform-specific (a `<canvas>` in the browser, an image-decoding utility
@@ -73,11 +77,11 @@ kind of object each stage produces should not change later):
   receives already-decoded grayscale data (a plain grid of 0–1 numbers), not
   an image file or a DOM `Image` object — this is what keeps it portable.
 - **sea-level → corrected elevation + underwater flag**: takes a ratio
-  parameter (e.g. 33%) and the raw per-point elevation from `terrain`. The
-  lowest-elevation points, by count, up to that ratio of the total point
-  count, are marked underwater. Sea level is set to the highest elevation
-  among those underwater points, then every point's elevation is shifted by
-  that amount, so sea level always ends up at 0.
+  parameter (33% by default, overridable) and the raw per-point elevation
+  from `terrain`. The lowest-elevation points, by count, up to that ratio
+  of the total point count, are marked underwater. Sea level is set to the
+  highest elevation among those underwater points, then every point's
+  elevation is shifted by that amount, so sea level always ends up at 0.
 - **coastline → split site-adjacency edges + coastline edges**: checks
   every site-adjacency edge from `mesh` for a sign change in elevation
   between its two points (one above 0, one below). Each such edge is split
@@ -111,9 +115,12 @@ derived, separate object, not a replacement for it.
 ## 3. Determinism
 
 Every module that needs randomness takes a seeded random source as an
-argument — it never reaches for `Math.random()` directly. One seed produces
-one city, always. The seeded-RNG choice itself is a small, self-contained
-utility (arguably the one piece of "randomness math" simple enough to write
+argument — it never reaches for `Math.random()` directly. The only inputs
+that can change a generated city are the seed and the supplied height-map
+image: the same seed with the same height-map image always produces the
+same city, with nothing else feeding in randomness anywhere in the
+pipeline. The seeded-RNG choice itself is a small, self-contained utility
+(arguably the one piece of "randomness math" simple enough to write
 in-house rather than pull in as a dependency); this gets settled in phase 1.
 
 ## 4. Rendering
@@ -177,9 +184,8 @@ parameters in and rendered output out.
     the even pass over the map.
   - **Triangulation / Voronoi** (phase 2, mesh): needed — building a bounded
     Voronoi diagram from the point set.
-  - **Noise** (phase 3, terrain): needed — a coherent-noise function (e.g.
-    Simplex/Perlin-family) added on top of the height-map value at each
-    point.
+  - **Noise** (phase 3, terrain): needed — Simplex noise, used as a
+    multiplying factor on the height-map value at each point.
   - **Image decoding** (phase 3, terrain, Node side only): needed in the
     Node-side adapter that reads the height-map image file into raw pixel
     values (see section 2) — not needed in the browser, which can decode

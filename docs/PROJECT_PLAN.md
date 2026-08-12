@@ -80,9 +80,9 @@ if rough.
 |---|---|---|
 | 0 | Scaffold | Folder layout, docs, empty module stubs (this phase). |
 | 1 | Core data model | Shared types/shapes used by every later module: point, edge, cell/polygon, and the city-model object that gets passed between stages. No generation yet, just the containers. |
-| 2 | Point mesh | A set of points covering the map, built in two passes: an even, minimum-spacing pass (Poisson-disk sampling), then a plain random pass (extra points with no spacing rule). A Voronoi diagram is then built from those points and clipped to the map's bounds. A cleanup pass collapses any diagram edge shorter than a set threshold down to a single point. |
-| 3 | Terrain / elevation | An elevation value for every point in the mesh. Read from a height-map image (any image, converted to grayscale and normalized to 0–1), sampled at each point's position, with noise added on top. A correction pass then flattens any point that ended up as a strict local maximum or minimum among its mesh neighbors, unless that point sits on the edge of the map. |
-| 4 | Sea level | Given a ratio (e.g. 33%), the lowest-elevation ratio of points, by count, are marked underwater. Sea level is set to the highest elevation among those underwater points. Every point's elevation is then shifted by that amount, so sea level sits at 0. |
+| 2 | Point mesh | 500 points from an even, minimum-spacing pass (Poisson-disk sampling), plus 500 points from a plain random pass (1000 points total). A Voronoi diagram is then built from those points and clipped to the map's bounds. A cleanup pass collapses any diagram edge shorter than 20 units down to a single point. |
+| 3 | Terrain / elevation | An elevation value for every point in the mesh. Read from a height-map image supplied by the caller (converted to grayscale and normalized to 0–1), sampled at each point's position, then multiplied by a Simplex-noise factor in the range 0.8–1.2. A correction pass then flattens any point that ended up as a strict local maximum or minimum among its Voronoi-edge neighbors (set to the average of those neighbors' elevations), unless that point sits on the edge of the map. |
+| 4 | Sea level | Given a ratio (33% by default, overridable by a parameter), the lowest-elevation ratio of points, by count, are marked underwater. Sea level is set to the highest elevation among those underwater points. Every point's elevation is then shifted by that amount, so sea level sits at 0. |
 | 5 | Coastline | The mesh's site-adjacency edges (pairs of neighboring points) are checked for a sign change in elevation. Any such edge is split at the point where it crosses 0. New edges then connect crossing points that share a triangle, linking them into a continuous coastline wherever land meets water. |
 | 6 | Road network | A graph of streets laid over the mesh: a small number of main roads, then a filled-in grid/organic network of minor streets, blocked by terrain (and water) where needed. |
 | 7 | Parcels & blocks | The area between streets is split into blocks, and blocks into parcels (individual building lots). |
@@ -118,29 +118,34 @@ once a later phase reveals its output isn't quite the right shape.
   Poisson-disk and plain-random points is the shared spatial structure that
   terrain (and later, roads and parcels) is built on. See
   [ARCHITECTURE.md](./ARCHITECTURE.md#2-pipeline-and-data-contracts).
+- **Point mesh density**: 500 points from the Poisson-disk pass, 500 points
+  from the plain-random pass — 1000 points total over the 5000 × 5000 map.
+  The Poisson-disk pass's minimum-spacing value follows from that target
+  count and the map area; it is not a separate setting.
+- **Edge-collapse threshold**: 20 units. Any Voronoi edge shorter than that
+  collapses to a single point.
+- **Height-map image source**: supplied by the caller as an actual image
+  file/parameter to the generation request. It is not generated
+  procedurally and not picked from a bundled set — "any image" in the
+  terrain data contract means "whichever image you give it".
+- **Elevation noise**: Simplex noise, used as a multiplier on the height-map
+  value rather than added on top of it. The noise is remapped to the range
+  0.8–1.2, so `elevation = heightMapValue * factor`.
+- **Local max/min correction**: "neighbor" means points connected by a
+  surviving Voronoi edge (the mesh's site-adjacency graph). A flattened
+  point's new elevation is the average of its neighbors' elevations.
+- **Sea-level ratio**: defaults to 33%, and can be overridden by a
+  parameter on the generation request.
+- **Determinism**: the whole pipeline is pseudo-random, driven only by the
+  seed and the supplied height-map image — no other hidden source of
+  randomness anywhere in the pipeline. The same seed with the same
+  height-map image always produces the same city.
 
 ## 9. Open questions
 
 These are flagged rather than decided, and should be settled before or during
 the phase that needs them:
 
-- **Point mesh density**: how many points the Poisson-disk pass and the
-  plain-random pass each place, and the minimum-spacing value the
-  Poisson-disk pass uses. Decide by phase 2.
-- **Edge-collapse threshold**: how short a Voronoi edge has to be before it
-  gets collapsed to a point. Decide by phase 2.
-- **Height-map image source**: "a random image" — generated procedurally, or
-  picked from a small bundled set of images? Decide by phase 3.
-- **Elevation noise**: which noise function, and how it combines with the
-  height-map value (added on top, blended, or something else). Decide by
-  phase 3.
-- **Local max/min correction rule**: exactly how a flattened point's new
-  elevation is chosen (e.g. the average of its mesh neighbors) and how
-  "neighbor" is defined (points joined by a surviving Voronoi edge). Decide
-  by phase 3.
-- **Sea-level ratio default**: 33% was given as an example, not necessarily
-  the default. What ratio applies when a generation request does not set
-  one? Decide by phase 4.
 - **How later phases use the mesh and coastline**: does a Voronoi cell
   become a parcel? Does a Voronoi edge become a candidate road? Does an
   underwater point mean its whole Voronoi cell is water? Does the
@@ -149,7 +154,3 @@ the phase that needs them:
 - **Browser dependency delivery**: how npm packages reach the browser without
   a bundler (import maps vs. a small dev-only build step). See
   [ARCHITECTURE.md](./ARCHITECTURE.md#7-dependency-delivery-browser).
-- **Determinism**: same seed must always produce the same city. This needs a
-  single seeded random source shared by every module (no use of the platform
-  `Math.random`), feeding both the Poisson-disk pass and the plain-random
-  pass. Decide the exact seeded-RNG approach by phase 1.
