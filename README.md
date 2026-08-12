@@ -23,11 +23,17 @@ Run the tests with `npm test`. See intermediate output with
 
 ## Example output
 
-[docs/examples/coastline-demo.svg](docs/examples/coastline-demo.svg) — debug
-render through the coastline stage (seed 1, ratio 0.33, from a hand-painted
-height map): filled Voronoi cells colored by elevation, with the coastline
-(636 edges) drawn on top in white. Not the real 2D renderer, which is still
-unbuilt — just a look at intermediate pipeline output.
+Debug renders through the coastline stage: filled Voronoi cells colored by
+elevation, with the coastline drawn on top in white. Not the real 2D
+renderer, which is still unbuilt — just a look at intermediate pipeline
+output.
+
+- [docs/examples/coastline-demo.svg](docs/examples/coastline-demo.svg) —
+  seed 1, ratio 0.33, from a hand-painted height map (636 coastline edges).
+- [docs/examples/two-hills-demo.svg](docs/examples/two-hills-demo.svg) —
+  seed 1, ratio 0.33, from
+  [docs/examples/two-hills-heightmap.png](docs/examples/two-hills-heightmap.png)
+  (226 coastline edges).
 
 ## Documentation
 
