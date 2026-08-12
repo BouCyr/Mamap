@@ -19,7 +19,15 @@ implemented yet — see [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for
 the roadmap.
 
 Run the tests with `npm test`. See intermediate output with
-`node scripts/debug-render.js [seed] [ratio] [outputPath]`.
+`node scripts/debug-render.js [heightMapPath|blank] [seed] [ratio] [outputPath]`.
+
+## Example output
+
+[docs/examples/coastline-demo.svg](docs/examples/coastline-demo.svg) — debug
+render through the coastline stage (seed 1, ratio 0.33, from a hand-painted
+height map): filled Voronoi cells colored by elevation, with the coastline
+(636 edges) drawn on top in white. Not the real 2D renderer, which is still
+unbuilt — just a look at intermediate pipeline output.
 
 ## Documentation
 
