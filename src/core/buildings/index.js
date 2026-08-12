@@ -1,4 +1,4 @@
-// Buildings stage (see docs/PROJECT_PLAN.md, phase 7).
+// Buildings stage (see docs/PROJECT_PLAN.md, phase 8).
 //
 // Takes the parcel polygons and the per-point elevation, returns a building
 // volume for each parcel: a footprint polygon, a height, and a simple roof

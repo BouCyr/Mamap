@@ -1,4 +1,4 @@
-// Roads stage (see docs/PROJECT_PLAN.md, phase 5).
+// Roads stage (see docs/PROJECT_PLAN.md, phase 6).
 //
 // Takes the point mesh and its per-point elevation and underwater flag,
 // returns a street graph: nodes (mesh points, with elevation) and edges

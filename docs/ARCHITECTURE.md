@@ -34,13 +34,14 @@ dimensions — see section 4).
 ```
 seed + params
     -> points     -> point set
-    -> mesh       -> bounded Voronoi diagram, cleaned up   (uses point set)
-    -> terrain    -> per-point elevation                    (uses mesh)
-    -> sea-level  -> corrected elevation + underwater flag  (uses elevation)
-    -> roads      -> street graph                           (uses mesh + elevation + underwater flag)
-    -> parcels    -> block/lot polygons                     (uses street graph, mesh)
-    -> buildings  -> building volumes                       (uses parcels + elevation)
-    -> project    -> flattened 2D map description           (uses everything above)
+    -> mesh       -> Voronoi diagram + site-adjacency graph  (uses point set)
+    -> terrain    -> per-point elevation                     (uses mesh)
+    -> sea-level  -> corrected elevation + underwater flag   (uses elevation)
+    -> coastline  -> split site-adjacency edges + coastline  (uses mesh's site-adjacency graph + elevation)
+    -> roads      -> street graph                            (uses mesh + elevation + underwater flag)
+    -> parcels    -> block/lot polygons                      (uses street graph, mesh)
+    -> buildings  -> building volumes                        (uses parcels + elevation)
+    -> project    -> flattened 2D map description            (uses everything above)
 ```
 
 Planned shape of each hand-off (exact fields will firm up in phase 1, but the
@@ -50,10 +51,15 @@ kind of object each stage produces should not change later):
   two passes: an even, minimum-spacing pass (Poisson-disk sampling), then a
   plain random pass (extra points, no spacing rule). The mix gives the mesh
   an even base plus some irregular variation.
-- **mesh → bounded Voronoi diagram**: the Voronoi diagram of the point set,
-  clipped to the map's bounds (so border cells are cut off cleanly instead
-  of running to infinity), then cleaned up by collapsing any edge shorter
-  than a set threshold down to a single point.
+- **mesh → Voronoi diagram + site-adjacency graph**: the Voronoi diagram of
+  the point set, clipped to the map's bounds (so border cells are cut off
+  cleanly instead of running to infinity), then cleaned up by collapsing
+  any edge shorter than a set threshold down to a single point. Building
+  the diagram this way also gives the site-adjacency graph for free: which
+  pairs of points are neighbors (their cells share a border). Later stages
+  that compare elevation between two points use this graph — the Voronoi
+  diagram's own corners and borders do not carry elevation, only the
+  original points do.
 - **terrain → per-point elevation**: an elevation value for every point in
   the mesh. Read from a height-map image (any image, converted to grayscale
   and normalized to 0–1) sampled at each point's position, with noise added
@@ -72,6 +78,17 @@ kind of object each stage produces should not change later):
   count, are marked underwater. Sea level is set to the highest elevation
   among those underwater points, then every point's elevation is shifted by
   that amount, so sea level always ends up at 0.
+- **coastline → split site-adjacency edges + coastline edges**: checks
+  every site-adjacency edge from `mesh` for a sign change in elevation
+  between its two points (one above 0, one below). Each such edge is split
+  at the point where it crosses 0, found by linear interpolation between
+  the two points' elevations — this replaces the one edge with two, meeting
+  at a new point with elevation exactly 0. Wherever two crossing points fall
+  on the same Delaunay triangle (the triangle of three mutually neighboring
+  points on that part of the mesh), a new edge connects them. The result is
+  a continuous coastline, made up of these new edges, running everywhere
+  land meets water — as an open curve where it reaches the map border, or a
+  closed loop around an island or lake that does not.
 - **roads → street graph**: nodes (mesh points, with elevation and the
   underwater flag) and edges (a road segment between two nodes, with a
   width/class: e.g. main road vs. minor street).
@@ -86,10 +103,10 @@ kind of object each stage produces should not change later):
   detail left in it. This is the boundary between `core` and rendering.
 
 A city model is the bundle of every stage's output kept together (point set +
-mesh + elevation + underwater flags + street graph + parcels + buildings),
-plus the seed and parameters that made it. This bundle is what phase 8's 3D
-preview reads from; the flattened 2D map description is a derived, separate
-object, not a replacement for it.
+mesh + elevation + underwater flags + coastline + street graph + parcels +
+buildings), plus the seed and parameters that made it. This bundle is what
+phase 9's 3D preview reads from; the flattened 2D map description is a
+derived, separate object, not a replacement for it.
 
 ## 3. Determinism
 
@@ -119,7 +136,7 @@ Two separate renderers consume `core`'s output, for two separate purposes:
   later, can be a "take the SVG, rasterize it" post-step rather than a
   second renderer.
 
-- **`src/render/three-d/`** — the optional 3D preview from phase 8. Browser
+- **`src/render/three-d/`** — the optional 3D preview from phase 9. Browser
   only (needs a `<canvas>` and a WebGL context; there is nothing to preview
   onto in Node). Uses raw WebGL, not a 3D engine library, to stay in line
   with the "no framework" rule. In Node, this module is simply never
@@ -138,7 +155,7 @@ should not be deciding building heights — that is `buildings`' job).
 - **`src/web/`** — a small browser page: a form for the seed/parameters, a
   "generate" button, and a spot to show the result. Calls the exact same
   `core` pipeline (imported as an ES module) and the same `render/two-d`
-  code, just in its browser mode. May optionally offer the phase 8 3D
+  code, just in its browser mode. May optionally offer the phase 9 3D
   preview alongside the 2D result.
 
 Neither entry point contains generation logic of its own — they only wire
@@ -167,7 +184,7 @@ parameters in and rendered output out.
     Node-side adapter that reads the height-map image file into raw pixel
     values (see section 2) — not needed in the browser, which can decode
     images with a `<canvas>` and no extra dependency.
-  - **Vector/matrix math** (phase 7/8): 3D vector, matrix, and quaternion
+  - **Vector/matrix math** (phase 8/9): 3D vector, matrix, and quaternion
     helpers for building volumes and the WebGL preview camera.
   Each will be picked, justified in a short note, and pinned when its phase
   actually starts.
@@ -200,26 +217,27 @@ docs/                   Project plan and this document.
 src/
   core/                 Pure generation logic. Node- and browser-safe.
     points/             Phase 2: point-set generation (Poisson-disk + random passes). Not yet scaffolded.
-    mesh/               Phase 2: bounded Voronoi diagram + short-edge collapse. Not yet scaffolded.
+    mesh/               Phase 2: Voronoi diagram + site-adjacency graph, short-edge collapse. Not yet scaffolded.
     terrain/            Phase 3: per-point elevation from a height-map image + noise, with local max/min correction.
     sea-level/          Phase 4: underwater flag + elevation shift so sea level sits at 0. Not yet scaffolded.
-    roads/              Phase 5: street graph generation.
-    parcels/            Phase 6: block/lot polygon generation.
-    buildings/          Phase 7: building volume generation.
-    project/            Phase 9: flatten the 3D city model to a 2D map description.
+    coastline/          Phase 5: split edges + new edges forming the coastline at elevation 0. Not yet scaffolded.
+    roads/              Phase 6: street graph generation.
+    parcels/            Phase 7: block/lot polygon generation.
+    buildings/          Phase 8: building volume generation.
+    project/            Phase 10: flatten the 3D city model to a 2D map description.
     index.js            Wires the stages above into one pipeline function.
   render/
-    two-d/              Phase 10: draw the flattened 2D map (5000 x 5000 SVG). Node- and browser-safe.
-    three-d/             Phase 8: optional WebGL preview of the 3D city model. Browser-only.
-  cli/                  Phase 11: Node command-line entry point.
-  web/                  Phase 11: browser page/UI entry point.
+    two-d/              Phase 11: draw the flattened 2D map (5000 x 5000 SVG). Node- and browser-safe.
+    three-d/             Phase 9: optional WebGL preview of the 3D city model. Browser-only.
+  cli/                  Phase 12: Node command-line entry point.
+  web/                  Phase 12: browser page/UI entry point.
 test/                   Tests, mirroring the src/ layout.
 ```
 
-`points/`, `mesh/`, and `sea-level/` are new since those stages were
-decided; they are not yet created (see phase 0's scaffold — it predates
-these decisions). They will be added, as empty stubs like their siblings,
-at the start of their phase.
+`points/`, `mesh/`, `sea-level/`, and `coastline/` are new since those
+stages were decided; they are not yet created (see phase 0's scaffold — it
+predates these decisions). They will be added, as empty stubs like their
+siblings, at the start of their phase.
 
 ## 9. Coding conventions
 

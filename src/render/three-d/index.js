@@ -1,4 +1,4 @@
-// Optional 3D preview (see docs/PROJECT_PLAN.md, phase 8, and
+// Optional 3D preview (see docs/PROJECT_PLAN.md, phase 9, and
 // docs/ARCHITECTURE.md, section 4).
 //
 // Browser-only: draws the full city model (mesh + elevation + roads +

@@ -1,4 +1,4 @@
-// Browser entry point (see docs/PROJECT_PLAN.md, phase 11, and
+// Browser entry point (see docs/PROJECT_PLAN.md, phase 12, and
 // docs/ARCHITECTURE.md, section 5).
 //
 // Will read the form in index.html (seed + parameters), run the core
