@@ -1,0 +1,16 @@
+{
+  "name": "mamap",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Generator for fictional city maps: 3D city model flattened into a 2D map.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "echo \"Not implemented yet. See docs/PROJECT_PLAN.md.\" && exit 1",
+    "test": "echo \"Not implemented yet. See docs/PROJECT_PLAN.md.\" && exit 1"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
