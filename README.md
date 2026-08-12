@@ -30,10 +30,14 @@ output.
 
 - [docs/examples/coastline-demo.svg](docs/examples/coastline-demo.svg) —
   seed 1, ratio 0.33, from a hand-painted height map (636 coastline edges).
-- [docs/examples/two-hills-demo.svg](docs/examples/two-hills-demo.svg) —
-  seed 1, ratio 0.33, from
-  [docs/examples/two-hills-heightmap.png](docs/examples/two-hills-heightmap.png)
-  (226 coastline edges).
+- Effect of `ratio` (the share of points forced underwater), same seed and
+  the same
+  [height map](docs/examples/two-hills-heightmap.png):
+  [ratio 0.33](docs/examples/two-hills-demo.svg) (sea level 0.4219, 226
+  coastline edges) vs.
+  [ratio 0.2](docs/examples/two-hills-demo-ratio-0.2.svg) (sea level
+  0.3314, 71 coastline edges) — a lower ratio pulls sea level down, so
+  less of the map floods and the coastline shrinks.
 
 ## Documentation
 
