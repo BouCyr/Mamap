@@ -19,12 +19,13 @@ implemented yet — see [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for
 the roadmap.
 
 Run the tests with `npm test`. See intermediate output with
-`node scripts/debug-render.js [heightMapPath|blank] [seed] [ratio] [outputPath]`.
+`node scripts/debug-render.js [heightMapPath|blank] [seed] [ratio] [outputPath] [pointMultiplier]`.
 
 ## Example output
 
-Debug renders through the coastline stage: filled Voronoi cells colored by
-elevation, with the coastline drawn on top in white. Not the real 2D
+Debug renders through the coastline stage: filled triangles colored by
+elevation, split into their land part and sea part wherever the coastline
+crosses them, with the coastline drawn on top in white. Not the real 2D
 renderer, which is still unbuilt — just a look at intermediate pipeline
 output.
 
@@ -38,6 +39,11 @@ output.
   [ratio 0.2](docs/examples/two-hills-demo-ratio-0.2.svg) (sea level
   0.3314, 71 coastline edges) — a lower ratio pulls sea level down, so
   less of the map floods and the coastline shrinks.
+- Effect of point count, same height map and ratio 0.2:
+  [1000 points](docs/examples/two-hills-demo-ratio-0.2.svg) vs.
+  [3000 points](docs/examples/two-hills-demo-3x-points.svg) (sea level
+  0.1545, 143 coastline edges) — more points give a finer mesh and a
+  more detailed coastline.
 
 ## Documentation
 

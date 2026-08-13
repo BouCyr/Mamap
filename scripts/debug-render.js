@@ -8,7 +8,13 @@
 // Not the real 2D renderer (that's phase 10/11, still unbuilt) - this is
 // only here to see intermediate pipeline output while building it.
 //
-// Usage: node scripts/debug-render.js [heightMapPath|blank] [seed] [ratio] [outputPath]
+// Usage: node scripts/debug-render.js [heightMapPath|blank] [seed] [ratio] [outputPath] [pointMultiplier]
+//
+// pointMultiplier (default 1) runs the phase-2 point generation that many
+// times over and concatenates the results, as a quick way to see the effect
+// of point density. It is not the same as a single, larger Poisson-disk
+// pass sized for the bigger count - each pass still spaces itself for the
+// default 500+500 count, so density comparisons here are approximate.
 
 import { writeFileSync } from 'node:fs';
 import { createCityModel, MAP_SIZE } from '../src/core/model/index.js';
@@ -23,6 +29,7 @@ const heightMapArg = process.argv[2] ?? 'blank';
 const seed = Number(process.argv[3] ?? 1);
 const ratio = Number(process.argv[4] ?? 0.33);
 const outputPath = process.argv[5] ?? 'debug-map.svg';
+const pointMultiplier = Number(process.argv[6] ?? 1);
 
 // "blank" is every point starting at the same mid-grey value, so elevation
 // comes only from the noise factor applied on top of it. Anything else is
@@ -30,7 +37,7 @@ const outputPath = process.argv[5] ?? 'debug-map.svg';
 const sampleHeight = heightMapArg === 'blank' ? () => 0.5 : loadHeightMap(heightMapArg);
 
 const cityModel = createCityModel(seed);
-const points = createPoints(cityModel);
+const points = Array.from({ length: pointMultiplier }, () => createPoints(cityModel)).flat();
 const mesh = createMesh(points);
 applyTerrain(points, mesh, sampleHeight, cityModel);
 const seaLevel = applySeaLevel(points, ratio);
@@ -39,7 +46,7 @@ const { coastlineEdges } = createCoastline(points, mesh);
 writeFileSync(outputPath, renderDebugSvg(points, mesh, coastlineEdges));
 console.log(
   `wrote ${outputPath} (heightMap ${heightMapArg}, seed ${seed}, ratio ${ratio}, ` +
-    `sea level was ${seaLevel.toFixed(4)}, ${coastlineEdges.length} coastline edges)`,
+    `${points.length} points, sea level was ${seaLevel.toFixed(4)}, ${coastlineEdges.length} coastline edges)`,
 );
 
 function renderDebugSvg(points, mesh, coastlineEdges) {
